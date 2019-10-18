@@ -212,6 +212,7 @@
                                 <td><code>{{epic_max_stories_field}}</code></td>
                             </tr>
                             {% endif %}
+                            {% if num_teams > 0 %}
                             <tr>
                                 <th>Teams</th>
                                 <td>
@@ -231,7 +232,7 @@
                                                 {% if team.min_throughput %}
                                                     <td>{{ team.min_throughput }} &ndash; {{ team.max_throughput }} stories/week</td>
                                                     <td></td>
-                                                {% else %}
+                                                {% elif team.throughput_samples %}
                                                     <td>
                                                         Historical data
                                                         {%- if team.throughput_samples_window %}
@@ -258,6 +259,9 @@
                                                         </a>
                                                         {% endif %}
                                                     </td>
+                                                {% else %}
+                                                    <td>(Forecasting disabled)</td>
+                                                    <td></td>
                                                 {% endif %}
                                                 <td>{{ team.wip }}</td>
                                             </tr>
@@ -266,12 +270,14 @@
                                     </table>
                                 </td>
                             </tr>
+                            {% endif %}
                         </tbody>
                     </table>
 
                 </div>
             </p>
 
+            {% if have_teams %}
             <ul class="nav nav-tabs" id="forecast-view-tabs" role="tablist">
                 <li class="nav-item">
                     <a class="nav-link active" id="outcome-tab" data-toggle="tab" href="#by-outcome" role="tab" aria-controls="by-outcome" aria-selected="true">By outcome</a>
@@ -280,6 +286,7 @@
                     <a class="nav-link" id="team-tab" data-toggle="tab" href="#by-team" role="tab" aria-controls="by-team" aria-selected="false">By team</a>
                 </li>
             </ul>
+            {% endif %}
   
             <div class="tab-content">
                 <div class="tab-pane fade show active" id="by-outcome" role="tabpanel" aria-labelledby="outcome-tab">
@@ -288,8 +295,11 @@
                         
                     {% if outcome.name %}
                     <h2>
-                        {{ outcome.name }}
-                        <a  class="d-print-none" data-toggle="collapse" href="#outcome-configuration-{{idx}}"><small class="text-muted">&raquo;</small></a>
+                        <a name="{{ outcome.key }}">{{ outcome.name }}</a>
+                        {% if outcome.is_jira %}
+                        <a class="icon-link d-print-none" href="{{ jira_url }}/browse/{{ outcome.key }}" target="_blank"><small class="fas fa-search"></small></a>
+                        {% endif %}
+                        <a class="d-print-none" data-toggle="collapse" href="#outcome-configuration-{{idx}}"><small class="text-muted">&raquo;</small></a>
                     </h2>
                     {% endif %}
 
@@ -306,6 +316,14 @@
                                             </a>
                                         </td>
                                     </tr>
+                                    {% if outcome_charts[outcome.key]['cfd'] %}
+                                    <tr>
+                                        <th style="width: 20%">Cumulative progress:</th>
+                                        <td>
+                                            <img style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ outcome_charts[outcome.key]['cfd'] }}" />
+                                        </td>
+                                    </tr>
+                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -315,24 +333,21 @@
                         <thead>
                             <tr>
                                 <th scope="col" style="width: 20%">Epic</th>
-                                <th scope="col" style="width: 10%">Team</th>
+                                {% if have_teams %}<th scope="col" style="width: 10%">Team</th>{% endif %}
                                 <th scope="col" style="width: 30%">Stories</th>
-                                {% if epic_deadline_field %}
                                 <th scope="col" style="width: 15%">Deadline</th>
-                                <th scope="col" style="width: 5%"></th>
-                                {% endif %}
-                                <th scope="col" style="width: 20%">Forecast (week starting)</th>
+                                {% if have_forecasts %} <th scope="col" style="width: 5%"></th> {% endif %}
+                                {% if have_forecasts %} <th scope="col" style="width: 20%">Forecast (week starting)</th> {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for epic in outcome.epics %}
                             <tr>
                                 <td><a class="epic-link" href="{{ jira_url }}/browse/{{ epic.key }}" target="_blank">{{ epic.key }}: {{ epic.summary }}</a></td>
-                                <td>{{ epic.team.name }}</td>
+                                {% if have_teams %}<td>{{ epic.team.name }}</td>{% endif %}
                                 <td>
                                     {{ epic_progress(epic )}}
                                 </td>
-                                {% if epic_deadline_field %}
                                 <td>
                                     {% if epic.deadline %}
                                     {{ epic.deadline.strftime("%d %b %Y") }}
@@ -340,13 +355,16 @@
                                     <em>N/A</em>
                                     {% endif %}
                                 </td>
+                                {% if have_forecasts %}
                                 <td>
                                     {{ epic_forecast_percentile(epic) }}
                                 </td>
                                 {% endif %}
+                                {% if have_forecasts %}
                                 <td>
                                     {{ epic_forecast_dates(epic) }}
                                 </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -355,6 +373,7 @@
                     {% endfor %}
                 </div>
 
+                {% if have_teams %}
                 <div class="tab-pane fade" id="by-team" role="tabpanel" aria-labelledby="team-tab">
             
                     {% for team in teams %}
@@ -367,24 +386,21 @@
                         <thead>
                             <tr>
                                 <th scope="col" style="width: 20%">Epic</th>
-                                <th scope="col" style="width: 10%">Outcome</th>
+                                {% if have_outcomes %} <th scope="col" style="width: 10%">Outcome</th> {% endif %}
                                 <th scope="col" style="width: 30%">Stories</th>
-                                {% if epic_deadline_field %}
                                 <th scope="col" style="width: 15%">Deadline</th>
-                                <th scope="col" style="width: 5%"></th>
-                                {% endif %}
-                                <th scope="col" style="width: 20%">Forecast (week starting)</th>
+                                {% if have_forecasts %} <th scope="col" style="width: 5%"></th> {% endif %}
+                                {% if have_forecasts %} <th scope="col" style="width: 20%">Forecast (week starting)</th> {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for epic in epics_by_team[team.name] %}
                             <tr>
                                 <td><a class="epic-link" href="{{ jira_url }}/browse/{{ epic.key }}" target="_blank">{{ epic.key }}: {{ epic.summary }}</a></td>
-                                <td>{{ epic.outcome.name }}</td>
+                                {% if have_outcomes %} <td>{{ epic.outcome.name }}</td> {% endif %}
                                 <td>
                                     {{ epic_progress(epic )}}
                                 </td>
-                                {% if epic_deadline_field %}
                                 <td>
                                     {% if epic.deadline %}
                                     {{ epic.deadline.strftime("%d %b %Y") }}
@@ -392,13 +408,16 @@
                                     <em>N/A</em>
                                     {% endif %}
                                 </td>
+                                {% if have_forecasts %}
                                 <td>
                                     {{ epic_forecast_percentile(epic) }}
                                 </td>
                                 {% endif %}
+                                {% if have_forecasts %}
                                 <td>
                                     {{ epic_forecast_dates(epic) }}
                                 </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -407,6 +426,7 @@
                     {% endfor %}
 
                 </div>
+                {% endif %}
 
             </div>
 
@@ -420,7 +440,7 @@
             <div id="team-cfd-{{ team.name | urlencode }}" class="perfundo__overlay fadeInLeft">
                 <figure class="perfundo__content perfundo__figure">
                     <figcaption class="perfundo__figcaption">Cumulative Flow Diagram of historical samples for {{ team.name }}</figcaption>
-                    <div class="perfundo__image" style="width: 800px; height: 500px; padding-top: 56.25%; background-image: url('data:image/png;base64, {{ team_charts[team.name]['cfd'] }}');"></div>
+                    <img class="perfundo__image" style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ team_charts[team.name]['cfd'] }}" />
                 </figure>
                 <a href="#perfundo-untarget" class="perfundo__close perfundo__control">Close</a>
             </div>
@@ -430,7 +450,7 @@
             <div id="team-throughput-{{ team.name | urlencode }}" class="perfundo__overlay fadeInLeft">
                 <figure class="perfundo__content perfundo__figure">
                     <figcaption class="perfundo__figcaption">Historical weekly throughput for {{ team.name }}</figcaption>
-                    <div class="perfundo__image" style="width: 800px; height: 700px; padding-top: 56.25%; background-image: url('data:image/png;base64, {{ team_charts[team.name]['throughput'] }}');"></div>
+                    <img class="perfundo__image" style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ team_charts[team.name]['throughput'] }}" />
                 </figure>
                 <a href="#perfundo-untarget" class="perfundo__close perfundo__control">Close</a>
             </div>
@@ -440,7 +460,7 @@
             <div id="team-scatterplot-{{ team.name | urlencode }}" class="perfundo__overlay fadeInLeft">
                 <figure class="perfundo__content perfundo__figure">
                     <figcaption class="perfundo__figcaption">Cycle time scatter plot for {{ team.name }}</figcaption>
-                    <div class="perfundo__image" style="width: 800px; height: 600px; padding-top: 56.25%; background-image: url('data:image/png;base64, {{ team_charts[team.name]['scatterplot'] }}');"></div>
+                    <img class="perfundo__image" style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ team_charts[team.name]['scatterplot'] }}" />
                 </figure>
                 <a href="#perfundo-untarget" class="perfundo__close perfundo__control">Close</a>
             </div>
@@ -456,7 +476,7 @@
                 <div id="epic-cfd-{{ epic.key | urlencode }}" class="perfundo__overlay fadeInLeft">
                     <figure class="perfundo__content perfundo__figure">
                         <figcaption class="perfundo__figcaption">Cumulative Flow Diagram for {{ epic.summary }}</figcaption>
-                        <div class="perfundo__image" style="width: 800px; height: 500px; padding-top: 56.25%; background-image: url('data:image/png;base64, {{ epic_charts[epic.key]['cfd'] }}');"></div>
+                        <img class="perfundo__image" style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ epic_charts[epic.key]['cfd'] }}" />
                     </figure>
                     <a href="#perfundo-untarget" class="perfundo__close perfundo__control">Close</a>
                 </div>
@@ -466,7 +486,7 @@
                 <div id="epic-scatterplot-{{ epic.key | urlencode }}" class="perfundo__overlay fadeInLeft">
                     <figure class="perfundo__content perfundo__figure">
                         <figcaption class="perfundo__figcaption">Cycle time scatter plot for {{ epic.summary }}</figcaption>
-                        <div class="perfundo__image" style="width: 800px; height: 600px; padding-top: 56.25%; background-image: url('data:image/png;base64, {{ epic_charts[epic.key]['scatterplot'] }}');"></div>
+                        <img class="perfundo__image" style="height: auto; width: auto; max-height: 600px; max-width: 800px" src="data:image/png;base64, {{ epic_charts[epic.key]['scatterplot'] }}" />
                     </figure>
                     <a href="#perfundo-untarget" class="perfundo__close perfundo__control">Close</a>
                 </div>
